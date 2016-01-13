@@ -26,6 +26,10 @@
         type:'hidden',
         name:base.options.postVariable
       });
+      $tokenElement = $("<input />",{
+        type:'hidden',
+        name:base.options.tokenVariable
+      });
 
       if (base.options.submitElement !== false) {
         var $submitElement = base.options.submitElement;
@@ -37,15 +41,18 @@
         $(this).attr("disabled", true);
         if (base.options.beforeEncryption()) {
           base.authenticate(
-            function(AESEncryptionKey) {
+            function(AESEncryptionKey, token) {
               var toEncrypt = base.$el.serialize();
               if ($submitElement.is(":submit")) {
                 toEncrypt = toEncrypt + "&" + $submitElement.attr("name") + "=" + $submitElement.val();
               }
               $encryptedElement.val($.jCryption.encrypt(toEncrypt, AESEncryptionKey));
+              $tokenElement.val(token);
               $(base.$el).find(base.options.formFieldSelector)
               .attr("disabled", true).end()
-              .append($encryptedElement).submit();
+              .append($encryptedElement)
+              .append($tokenElement)
+              .submit();
             },
             function() {
             	// Authentication with AES Failed ... sending form without protection
@@ -74,8 +81,10 @@
       if (window.crypto && window.crypto.getRandomValues) {
 	       var ckey = new Uint32Array(8);
         window.crypto.getRandomValues(ckey);
+        console.log("CryptoJS.lib.WordArray.create(ckey)");
 	       key = CryptoJS.lib.WordArray.create(ckey);
       } else {
+        console.log("CryptoJS.lib.WordArray.random(128/4)");
 	       key = CryptoJS.lib.WordArray.random(128/4);
       }
 
@@ -108,7 +117,7 @@
       $.jCryption.encryptKey(AESEncryptionKey, function(encryptedKey) {
         $.jCryption.handshake(handshakeURL, encryptedKey, function(response) {
           if ($.jCryption.challenge(response.challenge, AESEncryptionKey)) {
-            success.call(this, AESEncryptionKey);
+            success.call(this, AESEncryptionKey, response.apitoken);
           } else {
             failure.call(this);
           }
@@ -219,6 +228,7 @@
     handshakeURL: "jcryption.php?handshake=true",
     beforeEncryption: function() { return true },
     postVariable: "jCryption",
+    tokenVariable: "apitoken",
     formFieldSelector: ":input"
   };
 
